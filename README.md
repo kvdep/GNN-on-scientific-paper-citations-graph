@@ -69,7 +69,7 @@
 Для тестовой статьи $u_{test} \in V_{test}$ на момент инференса в матрице цитирований:
 
 $$
-\deg_{in}(u_{test}) = 0, \quad \deg_{out}(u_{test}) = 0
+\mathrm{deg}_{in}(u_{test}) = 0, \quad \mathrm{deg}_{out}(u_{test}) = 0
 $$
 
 Задача: для статьи $u_{test}$ отранжировать все статьи $v \in V_p$, удовлетворяющие причинно-следственному временному ограничению:
@@ -90,7 +90,7 @@ $$
 Исходный граф разрежен и содержит статьи без связей. Для формирования связной структуры соавторства применен алгоритм `k-core` с порогом $k=3$ к двудольному графу «автор-статья»:
 
 $$
-G_{\mathrm{core}} = \operatorname{k-core}(G_{\mathrm{bipartite}}, k=3)
+G_{\mathrm{core}} = \mathrm{k-core}(G_{\mathrm{bipartite}}, k=3)
 $$
 
 ### Количественные параметры выборки
@@ -161,24 +161,30 @@ $$
 
 ### 4. Парные структурные эвристики
 Для пары статей $(u, v)$ рассчитывается вектор $h_{uv}$:
-1. **Разница лет:** $\Delta t = y_u - y_v$;
-2. **Перекрытие соавторов (Jaccard):**
 
-   $$
-   J_{\mathrm{author}}(u, v) = \frac{|\mathcal{A}_u \cap \mathcal{A}_v|}{|\mathcal{A}_u \cup \mathcal{A}_v|}
-   $$
+#### Разница лет
 
-3. **Перекрытие концептов (Jaccard):**
+$$
+\Delta t = y_u - y_v
+$$
 
-   $$
-   J_{\mathrm{concept}}(u, v) = \frac{|\mathcal{C}_u \cap \mathcal{C}_v|}{|\mathcal{C}_u \cup \mathcal{C}_v|}
-   $$
+#### Перекрытие соавторов (Jaccard)
 
-4. **Априорная центральность (Hubness):**
+$$
+J_{\mathrm{author}}(u, v) = \frac{|\mathcal{A}_u \cap \mathcal{A}_v|}{|\mathcal{A}_u \cup \mathcal{A}_v|}
+$$
 
-   $$
-   \mathrm{Hub}(v) = \log(\mathrm{deg}_{in}(v) + 1)
-   $$
+#### Перекрытие концептов (Jaccard)
+
+$$
+J_{\mathrm{concept}}(u, v) = \frac{|\mathcal{C}_u \cap \mathcal{C}_v|}{|\mathcal{C}_u \cup \mathcal{C}_v|}
+$$
+
+#### Априорная центральность (Hubness)
+
+$$
+\mathrm{Hub}(v) = \log(\mathrm{deg}_{in}(v) + 1)
+$$
 
 ---
 
@@ -186,85 +192,90 @@ $$
 
 ### Графовые энкодеры
 
-* **LightGCN:** Симметричное линейное сглаживание по ребрам:
+#### LightGCN
+Симметричное линейное сглаживание по ребрам:
 
-  $$
-  \tilde{A} = \tilde{D}^{-1/2} (A + I) \tilde{D}^{-1/2}, \quad Z = \tilde{A} (X W)
-  $$
+$$
+\tilde{A} = \tilde{D}^{-1/2} (A + I) \tilde{D}^{-1/2}, \quad Z = \tilde{A} (X W)
+$$
 
-* **DirLightGCN:** Раздельная агрегация входящих и исходящих ребер:
+#### DirLightGCN
+Раздельная агрегация входящих и исходящих ребер:
 
-  $$
-  Z = X W + D_{\mathrm{out}}^{-1} A (X W) + D_{\mathrm{in}}^{-1} A^T (X W)
-  $$
+$$
+Z = X W + D_{\mathrm{out}}^{-1} A (X W) + D_{\mathrm{in}}^{-1} A^T (X W)
+$$
 
-* **NeoGNN:** Параллельное кодирование признаков через LightGCN и топологии через обучаемую матрицу эмбеддингов узлов $E \in \mathbb{R}^{|V| \times (d/2)}$:
+#### NeoGNN
+Параллельное кодирование признаков через LightGCN и топологии через обучаемую матрицу эмбеддингов узлов $E \in \mathbb{R}^{|V| \times (d/2)}$:
 
-  $$
-  Z = [Z_{\mathrm{feat}} \,\|\, Z_{\mathrm{struct}}], \quad Z_{\mathrm{struct}} = \tilde{A} E
-  $$
+$$
+Z = [Z_{\mathrm{feat}} \,\|\, Z_{\mathrm{struct}}], \quad Z_{\mathrm{struct}} = \tilde{A} E
+$$
 
-* **GraphSAGE:** Конкатенация собственного вектора и среднего по соседям:
+#### GraphSAGE
+Конкатенация собственного вектора и среднего по соседям:
 
-  $$
-  Z = \operatorname{ReLU}\left( W_1 X + W_2 (D^{-1} A X) \right)
-  $$
+$$
+Z = \mathrm{ReLU}\left( W_1 X + W_2 (D^{-1} A X) \right)
+$$
 
-* **SGC:** $k$-шаговое предварительное сглаживание:
+#### SGC
+$k$-шаговое предварительное сглаживание:
 
-  $$
-  Z = \tilde{A}^k X W
-  $$
+$$
+Z = \tilde{A}^k X W
+$$
 
 ### Предикторы связей
 
-* **BUDDY Predictor (Late Fusion):**
+#### BUDDY Predictor (Late Fusion)
 
-  $$
-  \mathbf{h}_{\mathrm{sem}} = \mathrm{MLP}_{\mathrm{sem}}([z_u \,\|\, z_v]), \quad \mathbf{h}_{\mathrm{str}} = \mathrm{MLP}_{\mathrm{str}}(h_{uv})
-  $$
+$$
+\mathbf{h}_{\mathrm{sem}} = \mathrm{MLP}_{\mathrm{sem}}([z_u \,\|\, z_v]), \quad \mathbf{h}_{\mathrm{str}} = \mathrm{MLP}_{\mathrm{str}}(h_{uv})
+$$
 
-  $$
-  \mathrm{Score}(u, v) = \sigma\left( \mathrm{MLP}_{\mathrm{fuse}}([\mathbf{h}_{\mathrm{sem}} \,\|\, \mathbf{h}_{\mathrm{str}}]) \right)
-  $$
+$$
+\mathrm{Score}(u, v) = \sigma\left( \mathrm{MLP}_{\mathrm{fuse}}([\mathbf{h}_{\mathrm{sem}} \,\|\, \mathbf{h}_{\mathrm{str}}]) \right)
+$$
 
-* **Standard Predictor:**
+#### Standard Predictor
 
-  $$
-  \mathrm{Score}(u, v) = \sigma\left( \mathrm{MLP}([z_u \,\|\, z_v \,\|\, z_u \odot z_v \,\|\, z_u - z_v \,\|\, h_{uv}]) \right)
-  $$
+$$
+\mathrm{Score}(u, v) = \sigma\left( \mathrm{MLP}([z_u \,\|\, z_v \,\|\, z_u \odot z_v \,\|\, z_u - z_v \,\|\, h_{uv}]) \right)
+$$
 
-* **NCN Predictor:**
+#### NCN Predictor
 
-  $$
-  \mathrm{Score}(u, v) = \sigma\left( \mathrm{MLP}([z_u \odot z_v \,\|\, h_{uv}]) \right)
-  $$
+$$
+\mathrm{Score}(u, v) = \sigma\left( \mathrm{MLP}([z_u \odot z_v \,\|\, h_{uv}]) \right)
+$$
 
 ### Функции потерь
 
-1. **Margin Ranking Loss:**
+#### Margin Ranking Loss
 
-   $$
-   \mathcal{L}_{\mathrm{Margin}} = \frac{1}{|B|} \sum_{(u, v^+, v^-) \in B} \max(0, s(u, v^-) - s(u, v^+) + \gamma)
-   $$
+$$
+\mathcal{L}_{\mathrm{Margin}} = \frac{1}{|B|} \sum_{(u, v^+, v^-) \in B} \max(0, s(u, v^-) - s(u, v^+) + \gamma)
+$$
 
-2. **Bayesian Personalized Ranking (BPR Loss):**
+#### Bayesian Personalized Ranking (BPR Loss)
 
-   $$
-   \mathcal{L}_{\mathrm{BPR}} = -\frac{1}{|B|} \sum_{(u, v^+, v^-) \in B} \log \sigma(s(u, v^+) - s(u, v^-))
-   $$
+$$
+\mathcal{L}_{\mathrm{BPR}} = -\frac{1}{|B|} \sum_{(u, v^+, v^-) \in B} \log \sigma(s(u, v^+) - s(u, v^-))
+$$
 
-3. **InfoNCE Loss:**
+#### InfoNCE Loss
 
-   $$
-   \mathcal{L}_{\mathrm{InfoNCE}} = -\frac{1}{|B|} \sum_{i} \left( \frac{s(u_i, v_i^+)}{\tau} - \log \sum_{j} \exp\left( \frac{s(u_i, v_{i, j}^-)}{\tau} \right) \right)
-   $$
+$$
+\mathcal{L}_{\mathrm{InfoNCE}} = -\frac{1}{|B|} \sum_{i} \left( \frac{s(u_i, v_i^+)}{\tau} - \log \sum_{j} \exp\left( \frac{s(u_i, v_{i, j}^-)}{\tau} \right) \right)
+$$
 
-4. **Asymmetric Loss (ASL):**
+#### Asymmetric Loss (ASL)
 
-   $$
-   \mathcal{L}_{\mathrm{ASL}} = -y (1 - p)^{\gamma_+} \log(p) - (1 - y) p^{\gamma_-} \log(1 - p)
-   $$
+$$
+\mathcal{L}_{\mathrm{ASL}} = -y (1 - p)^{\gamma_+} \log(p) - (1 - y) p^{\gamma_-} \log(1 - p)
+$$
 
 ---
 
@@ -272,35 +283,35 @@ $$
 
 Оценка выполняется по ранжированному списку кандидатов длины $N$:
 
-1. **Mean Reciprocal Rank (MRR):**
+### 1. Mean Reciprocal Rank (MRR)
 
-   $$
-   \mathrm{MRR} = \frac{1}{|Q|} \sum_{q=1}^{|Q|} \frac{1}{\mathrm{rank}_q^{(1)}}
-   $$
+$$
+\mathrm{MRR} = \frac{1}{|Q|} \sum_{q=1}^{|Q|} \frac{1}{\mathrm{rank}_q^{(1)}}
+$$
 
-   где $\mathrm{rank}_q^{(1)}$ — позиция первого релевантного документа в выдаче.
+где $\mathrm{rank}_q^{(1)}$ — позиция первого релевантного документа в выдаче.
 
-2. **Hits@K:**
+### 2. Hits@K
 
-   $$
-   \mathrm{Hits@K} = \frac{1}{|Q|} \sum_{q=1}^{|Q|} \mathbb{I}(\mathrm{rank}_q^{(1)} \le K)
-   $$
+$$
+\mathrm{Hits@K} = \frac{1}{|Q|} \sum_{q=1}^{|Q|} \mathbb{I}(\mathrm{rank}_q^{(1)} \le K)
+$$
 
-3. **Recall@K:**
+### 3. Recall@K
 
-   $$
-   \mathrm{Recall@K} = \frac{1}{|Q|} \sum_{q=1}^{|Q|} \frac{|\mathrm{Top}_K(q) \cap \mathrm{GT}(q)|}{|\mathrm{GT}(q)|}
-   $$
+$$
+\mathrm{Recall@K} = \frac{1}{|Q|} \sum_{q=1}^{|Q|} \frac{|\mathrm{Top}_K(q) \cap \mathrm{GT}(q)|}{|\mathrm{GT}(q)|}
+$$
 
-4. **Normalized Discounted Cumulative Gain (NDCG@K):**
+### 4. Normalized Discounted Cumulative Gain (NDCG@K)
 
-   $$
-   \mathrm{DCG@K} = \sum_{p \in \mathrm{GT}(q), p \le K} \frac{1}{\log_2(p + 1)}, \quad \mathrm{IDCG@K} = \sum_{p=1}^{\min(|\mathrm{GT}(q)|, K)} \frac{1}{\log_2(p + 1)}
-   $$
+$$
+\mathrm{DCG@K} = \sum_{p \in \mathrm{GT}(q), p \le K} \frac{1}{\log_2(p + 1)}, \quad \mathrm{IDCG@K} = \sum_{p=1}^{\min(|\mathrm{GT}(q)|, K)} \frac{1}{\log_2(p + 1)}
+$$
 
-   $$
-   \mathrm{NDCG@K} = \frac{\mathrm{DCG@K}}{\mathrm{IDCG@K}}
-   $$
+$$
+\mathrm{NDCG@K} = \frac{\mathrm{DCG@K}}{\mathrm{IDCG@K}}
+$$
 
 ---
 
