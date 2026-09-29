@@ -48,7 +48,7 @@
 1. **Эффективность связки LightGCN + BUDDY Predictor:**
    Конфигурация `LightGCN + BUDDY + Hub=True` показала наивысшее качество: **NDCG@10 = 0.2575**, **Hits@10 = 0.5950**, **MRR = 0.3516**. Архитектура позднего слияния (Late Fusion) в BUDDY обрабатывает семантику статьи и эвристики соавторства в раздельных полносвязных слоях, предотвращая доминирование одного типа признаков над другим.
 2. **Влияние априорной центральности (Hub Feature):**
-   Добавление логарифмированной входящей степени целевой статьи $\log(\text{in\_deg}_v + 1)$ увеличило NDCG@10 модели `LightGCN + BUDDY` с **0.2204** до **0.2575** (+16.8% относительного прироста). Входящие степени в сетях цитирования подчиняются степенному закону; распределение цитирований сильно скошено в сторону цитируемых статей-хабов.
+   Добавление логарифмированной входящей степени целевой статьи $\log(\mathrm{deg}_{in}(v) + 1)$ увеличило NDCG@10 модели `LightGCN + BUDDY` с **0.2204** до **0.2575** (+16.8% относительного прироста). Входящие степени в сетях цитирования подчиняются степенному закону; распределение цитирований сильно скошено в сторону цитируемых статей-хабов.
 3. **Коллапс классификационных лоссов:**
    Классификационные функции потерь (Focal Loss, ASL) показали значение NDCG@10 < **0.001**. При ранжировании 1-vs-all количество отрицательных примеров превышает положительные в $10^4$ раз, из-за чего классификаторы зануляют вероятности для всех пар. Ранжирующие функции потерь (Margin Loss, BPR Loss) оптимизируют относительный зазор между парами, сохраняя точность порядка ранжирования.
 4. **Ограничения табличного градиентного бустинга (GBDT):**
@@ -58,19 +58,26 @@
 
 ## 2. Постановка задачи (Problem Formulation)
 
-Пусть задан ориентированный граф цитирования $G = (V_p, E_{cites})$, где $V_p$ — множество научных статей, а $(u, v) \in E_{cites}$ обозначает факт цитирования статьи $v$ статьей $u$. Одновременно задано множество авторов $V_a$ и двудольные ребра авторства $E_{writes} \subseteq V_a \times V_p$.
+Пусть задан ориентированный граф цитирования $G = (V_p, E_{\mathrm{cites}})$, где $V_p$ — множество научных статей, а $(u, v) \in E_{\mathrm{cites}}$ обозначает факт цитирования статьи $v$ статьей $u$. Одновременно задано множество авторов $V_a$ и двудольные ребра авторства $E_{\mathrm{writes}} \subseteq V_a \times V_p$.
 
 Для каждой статьи $u \in V_p$ известны:
 * Год публикации $y_u \in \mathbb{N}$;
 * Текстовые поля: заголовок $T_u$, аннотация $A_u$, ключевые концепты $C_u$;
-* Множество соавторов $Authors(u) \subseteq V_a$.
+* Множество соавторов $\mathcal{A}_u \subseteq V_a$.
 
 ### Условие индуктивного холодного старта
-Для тестовой статьи $u_{test} \in V_{test}$ на момент инференса:
-$$\deg_{in}(u_{test}) = 0, \quad \deg_{out}(u_{test}) = 0 \quad \text{в матрице цитирований}$$
+Для тестовой статьи $u_{test} \in V_{test}$ на момент инференса в матрице цитирований:
+
+$$
+\deg_{in}(u_{test}) = 0, \quad \deg_{out}(u_{test}) = 0
+$$
 
 Задача: для статьи $u_{test}$ отранжировать все статьи $v \in V_p$, удовлетворяющие причинно-следственному временному ограничению:
-$$\mathcal{C}(u_{test}) = \{ v \in V_p \setminus \{u_{test}\} \mid y_v \le y_{u_{test}} \}$$
+
+$$
+\mathcal{C}(u_{test}) = \{ v \in V_p \setminus \{u_{test}\} \mid y_v \le y_{u_{test}} \}
+$$
+
 так, чтобы истинные статьи из библиографического списка $u_{test}$ заняли наивысшие позиции в выдаче.
 
 ---
@@ -79,9 +86,12 @@ $$\mathcal{C}(u_{test}) = \{ v \in V_p \setminus \{u_{test}\} \mid y_v \le y_{u_
 
 Я собрал выборку через REST API каталога **OpenAlex** по предметной области Machine Learning за 10 лет (хронологический диапазон: 2017–2026 гг.).
 
-### Фильтрация плотного ядра ($k$-core)
-Исходный граф разрежен и содержит статьи без связей. Для формирования связной структуры соавторства применен алгоритм $k$-core с порогом $k=3$ к двудольному графу «автор-статья»:
-$$H_{core} = k\text{-core}(G_{bipartite}, k=3)$$
+### Фильтрация плотного ядра (`k-core`)
+Исходный граф разрежен и содержит статьи без связей. Для формирования связной структуры соавторства применен алгоритм `k-core` с порогом $k=3$ к двудольному графу «автор-статья»:
+
+$$
+G_{\mathrm{core}} = \operatorname{k-core}(G_{\mathrm{bipartite}}, k=3)
+$$
 
 ### Количественные параметры выборки
 * **Всего статей в ядре:** 54 262
@@ -125,29 +135,50 @@ $$H_{core} = k\text{-core}(G_{bipartite}, k=3)$$
 * Модель: `pritamdeka/S-SciBERT-snli-multinli-stsb`.
 * Векторизация полей: Заголовок (768), Аннотация (768), Концепты (768). Конкатенация формирует вектор размерности 2304.
 * Сжатие: полносвязный автоэнкодер (`TextAE`):
-  * **Encoder:** $\text{Linear}(2304 \to 1024) \to \text{LayerNorm} \to \text{GELU} \to \text{Dropout}(0.1) \to \text{Linear}(1024 \to 256)$
-  * **Decoder:** $\text{Linear}(256 \to 1024) \to \text{LayerNorm} \to \text{GELU} \to \text{Dropout}(0.1) \to \text{Linear}(1024 \to 2304)$
-  * **Обучение:** 40 эпох, AdamW, $\text{lr}=10^{-3}$, целевая функция — MSE. Выходной латентный вектор статьи имеет размерность **256**.
+  * **Encoder:** `Linear(2304 → 1024) → LayerNorm → GELU → Dropout(0.1) → Linear(1024 → 256)`
+  * **Decoder:** `Linear(256 → 1024) → LayerNorm → GELU → Dropout(0.1) → Linear(1024 → 2304)`
+  * **Обучение:** 40 эпох, AdamW, $\mathrm{lr} = 10^{-3}$, целевая функция — MSE. Выходной латентный вектор статьи имеет размерность **256**.
 
 ### 2. Топологические эмбеддинги (FastRP)
 Алгоритм Fast Random Projection рассчитывает проекции без градиентного спуска. На матрице смежности цитирований и соавторства $A$ строится матрица переходов случайного блуждания:
-$$P = D^{-1} A$$
+
+$$
+P = D^{-1} A
+$$
+
 Генерируется случайная матрица проекций $R \in \mathbb{R}^{|V| \times d}$ ($d=128$). Финальное представление рассчитывается по 3 шагам блуждания с весами $w = [0.1, 0.4, 0.5]$:
-$$Z_{topo} = \sum_{l=1}^{3} w_l P^l R$$
+
+$$
+Z_{\mathrm{topo}} = \sum_{l=1}^{3} w_l P^l R
+$$
 
 ### 3. Агрегация авторской топологии
 Для каждой статьи $u$ вычисляется средний топологический вектор ее соавторов:
-$$z_{author}(u) = \frac{1}{|Authors(u)|} \sum_{a \in Authors(u)} z_a$$
+
+$$
+z_{\mathrm{author}}(u) = \frac{1}{|\mathcal{A}_u|} \sum_{a \in \mathcal{A}_u} z_a
+$$
 
 ### 4. Парные структурные эвристики
 Для пары статей $(u, v)$ рассчитывается вектор $h_{uv}$:
 1. **Разница лет:** $\Delta t = y_u - y_v$;
 2. **Перекрытие соавторов (Jaccard):**
-   $$J_{author}(u, v) = \frac{|Authors(u) \cap Authors(v)|}{|Authors(u) \cup Authors(v)|}$$
+
+   $$
+   J_{\mathrm{author}}(u, v) = \frac{|\mathcal{A}_u \cap \mathcal{A}_v|}{|\mathcal{A}_u \cup \mathcal{A}_v|}
+   $$
+
 3. **Перекрытие концептов (Jaccard):**
-   $$J_{concept}(u, v) = \frac{|Concepts(u) \cap Concepts(v)|}{|Concepts(u) \cup Concepts(v)|}$$
+
+   $$
+   J_{\mathrm{concept}}(u, v) = \frac{|\mathcal{C}_u \cap \mathcal{C}_v|}{|\mathcal{C}_u \cup \mathcal{C}_v|}
+   $$
+
 4. **Априорная центральность (Hubness):**
-   $$Hub(v) = \log(\text{in\_deg}_v + 1)$$
+
+   $$
+   \mathrm{Hub}(v) = \log(\mathrm{deg}_{in}(v) + 1)
+   $$
 
 ---
 
@@ -156,35 +187,84 @@ $$z_{author}(u) = \frac{1}{|Authors(u)|} \sum_{a \in Authors(u)} z_a$$
 ### Графовые энкодеры
 
 * **LightGCN:** Симметричное линейное сглаживание по ребрам:
-  $$\tilde{A} = \tilde{D}^{-1/2} (A + I) \tilde{D}^{-1/2}, \quad Z = \tilde{A} (X W)$$
+
+  $$
+  \tilde{A} = \tilde{D}^{-1/2} (A + I) \tilde{D}^{-1/2}, \quad Z = \tilde{A} (X W)
+  $$
+
 * **DirLightGCN:** Раздельная агрегация входящих и исходящих ребер:
-  $$Z = X W + D_{out}^{-1} A (X W) + D_{in}^{-1} A^T (X W)$$
+
+  $$
+  Z = X W + D_{\mathrm{out}}^{-1} A (X W) + D_{\mathrm{in}}^{-1} A^T (X W)
+  $$
+
 * **NeoGNN:** Параллельное кодирование признаков через LightGCN и топологии через обучаемую матрицу эмбеддингов узлов $E \in \mathbb{R}^{|V| \times (d/2)}$:
-  $$Z = [Z_{feat} \parallel Z_{struct}], \quad Z_{struct} = \tilde{A} E$$
+
+  $$
+  Z = [Z_{\mathrm{feat}} \,\|\, Z_{\mathrm{struct}}], \quad Z_{\mathrm{struct}} = \tilde{A} E
+  $$
+
 * **GraphSAGE:** Конкатенация собственного вектора и среднего по соседям:
-  $$Z = \text{ReLU}\left( W_1 X + W_2 (D^{-1} A X) \right)$$
-* **SGC:** $k$-шаговое предварительное сглаживание $\tilde{A}^k X W$.
+
+  $$
+  Z = \operatorname{ReLU}\left( W_1 X + W_2 (D^{-1} A X) \right)
+  $$
+
+* **SGC:** $k$-шаговое предварительное сглаживание:
+
+  $$
+  Z = \tilde{A}^k X W
+  $$
 
 ### Предикторы связей
 
 * **BUDDY Predictor (Late Fusion):**
-  $$\text{rep}_{sem} = \text{MLP}_{sem}([z_u \parallel z_v]), \quad \text{rep}_{str} = \text{MLP}_{str}(h_{uv})$$
-  $$\text{Score}(u, v) = \sigma\left( \text{MLP}_{fuse}([\text{rep}_{sem} \parallel \text{rep}_{str}]) \right)$$
+
+  $$
+  \mathbf{h}_{\mathrm{sem}} = \mathrm{MLP}_{\mathrm{sem}}([z_u \,\|\, z_v]), \quad \mathbf{h}_{\mathrm{str}} = \mathrm{MLP}_{\mathrm{str}}(h_{uv})
+  $$
+
+  $$
+  \mathrm{Score}(u, v) = \sigma\left( \mathrm{MLP}_{\mathrm{fuse}}([\mathbf{h}_{\mathrm{sem}} \,\|\, \mathbf{h}_{\mathrm{str}}]) \right)
+  $$
+
 * **Standard Predictor:**
-  $$\text{Score}(u, v) = \sigma\left( \text{MLP}([z_u \parallel z_v \parallel z_u \odot z_v \parallel z_u - z_v \parallel h_{uv}]) \right)$$
+
+  $$
+  \mathrm{Score}(u, v) = \sigma\left( \mathrm{MLP}([z_u \,\|\, z_v \,\|\, z_u \odot z_v \,\|\, z_u - z_v \,\|\, h_{uv}]) \right)
+  $$
+
 * **NCN Predictor:**
-  $$\text{Score}(u, v) = \sigma\left( \text{MLP}([z_u \odot z_v \parallel h_{uv}]) \right)$$
+
+  $$
+  \mathrm{Score}(u, v) = \sigma\left( \mathrm{MLP}([z_u \odot z_v \,\|\, h_{uv}]) \right)
+  $$
 
 ### Функции потерь
 
 1. **Margin Ranking Loss:**
-   $$\mathcal{L}_{Margin} = \frac{1}{|B|} \sum_{(u, v^+, v^-) \in B} \max(0, s(u, v^-) - s(u, v^+) + \gamma)$$
+
+   $$
+   \mathcal{L}_{\mathrm{Margin}} = \frac{1}{|B|} \sum_{(u, v^+, v^-) \in B} \max(0, s(u, v^-) - s(u, v^+) + \gamma)
+   $$
+
 2. **Bayesian Personalized Ranking (BPR Loss):**
-   $$\mathcal{L}_{BPR} = -\frac{1}{|B|} \sum_{(u, v^+, v^-) \in B} \log \sigma(s(u, v^+) - s(u, v^-))$$
+
+   $$
+   \mathcal{L}_{\mathrm{BPR}} = -\frac{1}{|B|} \sum_{(u, v^+, v^-) \in B} \log \sigma(s(u, v^+) - s(u, v^-))
+   $$
+
 3. **InfoNCE Loss:**
-   $$\mathcal{L}_{InfoNCE} = -\frac{1}{|B|} \sum_{i} \left( \frac{s(u_i, v_i^+)}{\tau} - \log \sum_{j} \exp\left( \frac{s(u_i, v_{i, j}^-)}{\tau} \right) \right)$$
+
+   $$
+   \mathcal{L}_{\mathrm{InfoNCE}} = -\frac{1}{|B|} \sum_{i} \left( \frac{s(u_i, v_i^+)}{\tau} - \log \sum_{j} \exp\left( \frac{s(u_i, v_{i, j}^-)}{\tau} \right) \right)
+   $$
+
 4. **Asymmetric Loss (ASL):**
-   $$\mathcal{L}_{ASL} = -y (1 - p)^{\gamma_+} \log(p) - (1 - y) p^{\gamma_-} \log(1 - p)$$
+
+   $$
+   \mathcal{L}_{\mathrm{ASL}} = -y (1 - p)^{\gamma_+} \log(p) - (1 - y) p^{\gamma_-} \log(1 - p)
+   $$
 
 ---
 
@@ -193,18 +273,34 @@ $$z_{author}(u) = \frac{1}{|Authors(u)|} \sum_{a \in Authors(u)} z_a$$
 Оценка выполняется по ранжированному списку кандидатов длины $N$:
 
 1. **Mean Reciprocal Rank (MRR):**
-   $$\text{MRR} = \frac{1}{|Q|} \sum_{q=1}^{|Q|} \frac{1}{\text{rank}_q^{(1)}}$$
-   где $\text{rank}_q^{(1)}$ — позиция первого релевантного документа.
+
+   $$
+   \mathrm{MRR} = \frac{1}{|Q|} \sum_{q=1}^{|Q|} \frac{1}{\mathrm{rank}_q^{(1)}}
+   $$
+
+   где $\mathrm{rank}_q^{(1)}$ — позиция первого релевантного документа в выдаче.
 
 2. **Hits@K:**
-   $$\text{Hits@K} = \frac{1}{|Q|} \sum_{q=1}^{|Q|} \mathbb{I}(\text{rank}_q^{(1)} \le K)$$
+
+   $$
+   \mathrm{Hits@K} = \frac{1}{|Q|} \sum_{q=1}^{|Q|} \mathbb{I}(\mathrm{rank}_q^{(1)} \le K)
+   $$
 
 3. **Recall@K:**
-   $$\text{Recall@K} = \frac{1}{|Q|} \sum_{q=1}^{|Q|} \frac{|\text{Top}_K(q) \cap GT(q)|}{|GT(q)|}$$
+
+   $$
+   \mathrm{Recall@K} = \frac{1}{|Q|} \sum_{q=1}^{|Q|} \frac{|\mathrm{Top}_K(q) \cap \mathrm{GT}(q)|}{|\mathrm{GT}(q)|}
+   $$
 
 4. **Normalized Discounted Cumulative Gain (NDCG@K):**
-   $$\text{DCG@K} = \sum_{p \in pos, p \le K} \frac{1}{\log_2(p + 1)}, \quad \text{IDCG@K} = \sum_{p=1}^{\min(|GT|, K)} \frac{1}{\log_2(p + 1)}$$
-   $$\text{NDCG@K} = \frac{\text{DCG@K}}{\text{IDCG@K}}$$
+
+   $$
+   \mathrm{DCG@K} = \sum_{p \in \mathrm{GT}(q), p \le K} \frac{1}{\log_2(p + 1)}, \quad \mathrm{IDCG@K} = \sum_{p=1}^{\min(|\mathrm{GT}(q)|, K)} \frac{1}{\log_2(p + 1)}
+   $$
+
+   $$
+   \mathrm{NDCG@K} = \frac{\mathrm{DCG@K}}{\mathrm{IDCG@K}}
+   $$
 
 ---
 
@@ -265,7 +361,7 @@ pip install -r requirements.txt
 python scripts/fetch_data.py --output data/raw_data.jsonl --start-year 2017 --end-year 2026 --target-per-year 200000
 ```
 
-### 2. Построение графа и прунинг ($k=3$)
+### 2. Построение графа и прунинг (`k-core`)
 ```bash
 python scripts/build_graph.py --input data/raw_data.jsonl --output data/processed_graph.pkl --k-core 3
 ```
