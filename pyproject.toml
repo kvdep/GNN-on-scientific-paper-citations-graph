@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "citation-gnn-link-prediction"
+version = "1.0.0"
+authors = [
+  { name="Alexander Kydysiuk", email="numl2202@gmail.com" },
+]
+description = "Graph Neural Networks and Gradient Boosting for Inductive Cold-Start Link Prediction in Scientific Citation Graphs"
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "torch>=2.0.0",
+    "networkx>=3.0",
+    "scipy>=1.10.0",
+    "numpy>=1.24.0",
+    "scikit-learn>=1.2.0",
+    "requests>=2.28.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]

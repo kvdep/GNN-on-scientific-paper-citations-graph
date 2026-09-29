@@ -1,0 +1,52 @@
+# Citation Network Link Prediction Configuration
+
+data:
+  raw_jsonl: "data/raw_data.jsonl"
+  graph_pkl: "data/processed_graph.pkl"
+  features_pt: "data/features.pt"
+  scoreboard_csv: "scoreboard.csv"
+  k_core: 3
+  train_ratio: 0.85
+  val_ratio: 0.05
+  test_ratio: 0.10
+  seed: 42
+
+features:
+  text:
+    model_name: "pritamdeka/S-SciBERT-snli-multinli-stsb"
+    input_dim: 2304
+    bottleneck_dim: 256
+    epochs: 40
+    batch_size: 2048
+    lr: 0.001
+  fastrp:
+    dim: 128
+    steps: 3
+    weights: [0.1, 0.4, 0.5]
+  heuristics:
+    use_hub: true
+    stop_concepts:
+      - "artificial"
+      - "intelligence"
+      - "machine"
+      - "learning"
+      - "computer"
+      - "science"
+
+gnn_training:
+  latent_dim: 128
+  batch_size: 4096
+  lr: 0.001
+  weight_decay: 0.0001
+  epochs: 15
+  patience: 3
+  encoder: "lightgcn"
+  predictor: "buddy"
+  loss: "bce"
+
+gbdt_training:
+  iterations: 1000
+  learning_rate: 0.05
+  depth: 6
+  loss_function: "YetiRank"
+  candidate_pool_size: 100
